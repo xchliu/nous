@@ -328,6 +328,98 @@ Phase2：API token认证（各agent注册时分配）
 - agent_registry数据公开——任何agent可查其他agent状态
 - task_events公开——任务生命周期全员可见
 
+## Agent离线容错与任务接管
+
+### 核心原则
+
+**信道可以降级，任务不能悬空。** agent离线是预期内的事件（进程崩溃、网络中断、维护重启），但离线agent手里的任务必须有明确的处理机制——不能等它回来才继续推进。
+
+### 离线分级与响应策略
+
+苏哥的心跳探活cron每30秒检测一次gateway状态。根据连续离线时长，触发不同级别的任务处理：
+
+| 级别 | 离线时长 | 触发条件 | 任务处理 |
+|------|----------|----------|----------|
+| L0 短暂 | <5分钟 | 1-2次探活失败 | **冻结**：任务标记为suspended，等待agent恢复。不影响其他并行任务流 |
+| L1 中度 | 5-30分钟 | 连续10次探活失败 | **告警+评估**：苏哥收到企微告警，评估该agent任务是否可被其他agent接管。同时检查黑板有无BLOCKED信号（agent可能在离线前发了阻塞信号） |
+| L2 长期 | >30分钟 | 连续60次探活失败 | **自动接管**：任务从离线agent解绑，苏哥重新分配给在线agent。任务优先级不变，接替agent继承任务上下文（黑板+Signal Log） |
+| L3 不可恢复 | >2小时 | 连续240次探活失败 | **人工介入**：苏哥告警坦哥，坦哥决定：1)运维修复agent 2)项目方向调整 3)任务降级或取消 |
+
+### 任务接管协议
+
+当agent进入L2长期离线，苏哥执行以下接管流程：
+
+```
+1. 查询离线agent持有的所有in_progress任务
+   → SELECT * FROM kanban_tasks WHERE assigned_to = 'offline_agent' AND status = 'in_progress'
+
+2. 任务解绑
+   → UPDATE kanban_tasks SET assigned_to = NULL, status = 'reassigned' WHERE ...
+
+3. 生成REASSIGNED事件
+   → INSERT INTO task_events (task_id, event_type, actor, metadata)
+     VALUES ('TD-003', 'reassigned', 'hermes', '{"from": "offline_agent", "reason": "L2_offline"}')
+
+4. 评估接管可行性
+   → 任务类型匹配：架构任务→柏拉图，开发任务→小亚
+   → agent负载检查：接替agent当前in_progress任务数<2才分配
+   → 依赖链检查：任务是否依赖离线agent的未完成产出？依赖则暂停等待
+
+5. 重新分配
+   → UPDATE kanban_tasks SET assigned_to = 'new_agent', status = 'in_progress' WHERE ...
+
+6. 广播接管信号
+   → SYNC信号："{offline_agent} L2离线，TD-003由{new_agent}接管"
+   → 黑板追加接管记录
+
+7. 上下文传递给接替agent
+   → 接替agent查询Signal Log获取任务全部历史信号
+   → 接替agent查询黑板获取离线agent的工作记录
+   → 接替agent获得完整上下文后开始工作
+```
+
+### 不可接管的任务
+
+某些任务不可自动接管，需等待原agent恢复或坦哥决策：
+
+| 任务特征 | 处理方式 |
+|----------|----------|
+| 深度架构设计（柏拉图独有能力） | 暂停等待，苏哥评估是否可以简化架构让小亚推进 |
+| 有本地未提交代码的in_progress开发 | 暂停等待，代码在离线agent本地可能不完整 |
+| 需要特定agent认证的操作（如企微推送） | 暂停等待或苏哥代行 |
+| 坦哥明确指定某agent执行的任务 | 通知坦哥，等待决策 |
+
+### 自恢复机制
+
+agent恢复在线后，苏哥执行以下恢复流程：
+
+```
+1. 心跳探活检测到agent恢复
+2. 查询该agent被解绑的任务
+   → SELECT * FROM kanban_tasks WHERE original_assigned_to = 'recovered_agent' AND status = 'reassigned'
+
+3. 两种恢复路径：
+   a) 任务未被接管（仍在reassigned状态）→ 重新分配给原agent
+   b) 任务已被其他agent接管（in_progress）→ 不干扰，原agent接收新任务
+
+4. 广播恢复信号
+   → SYNC: "{recovered_agent}恢复在线，{任务状态描述}"
+
+5. 检查Signal Log一致性
+   → 对比黑板记录和Signal Log，补录离线期间的遗漏信号
+```
+
+### 预期外离线的零容忍
+
+**核心规则：agent预期外的离线等同于生产事故。**
+
+- 每次L1+离线，苏哥自动生成离线事件记录（agent_id, 离线时间, 恢复时间, 影响任务数, 接管情况）
+- 每周回顾统计每个agent的离线次数和时长，坦哥可见
+- 同一agent连续2天出现L1+离线→苏哥主动排查根因（进程稳定性、网络、配置）
+- 同一agent一周内3次L1+离线→告警坦哥，需要人工介入修复
+
+**目标：Nous框架运行稳定后，L1+离线应该为零。偶尔L0短暂闪断是可接受的，但超过5分钟的离线不应该常态化。**
+
 ## 错误处理
 
 ### 传输层错误
