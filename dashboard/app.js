@@ -1,41 +1,47 @@
 /* ============================================
-   Nous Dashboard — Application Logic
+   Nous Dashboard v2 — Application Logic
    ============================================ */
 
 // ========== Config ==========
 const CONFIG = {
-  agents: [
-    { id: 'socrates',  name: '苏格拉底', port: 8642, color: '#2563eb' },
-    { id: 'aris',      name: '小亚',     port: 8643, color: '#10b981' },
-    { id: 'plato',     name: '柏拉图',   port: 8645, color: '#f97316' },
-    { id: 'grace',     name: 'Grace',    port: 8644, color: '#f59e0b' },
-    { id: 'gateway',   name: 'Gateway',  port: 8000, color: '#8b5cf6' },
-  ],
-  selfmind: 'http://localhost:3002',
+  NOUS_API: 'http://localhost:8600',
+  NOUS_TOKEN: 'nous-admin-token-v2',
   refreshInterval: 30000,
   timeout: 5000,
-  memoryAgents: [
-    { id: 'hermes', name: 'Hermes', color: '#2563eb' },
-    { id: 'aris',   name: 'Aris',   color: '#10b981' },
-    { id: 'plato',  name: 'Plato',  color: '#f97316' },
-  ],
   agentColors: {
-    hermes: '#2563eb',
-    aris:   '#10b981',
-    plato:  '#f97316',
+    socrates: '#2563eb',
+    aris: '#10b981',
+    plato: '#f97316',
+    grace: '#f59e0b',
+  },
+  signalLabels: {
+    HEARTBEAT: '❤',
+    DONE: '✔',
+    BLOCKED: '!',
+    'ASK:arch': '?',
+    'ASK:impl': '?',
+    SYNC: '↻',
+    REPAIR: '⚡',
+  },
+  signalColors: {
+    HEARTBEAT: '#94a3b8',
+    DONE: '#22c55e',
+    BLOCKED: '#ef4444',
+    'ASK:arch': '#f59e0b',
+    'ASK:impl': '#f59e0b',
+    SYNC: '#3b82f6',
+    REPAIR: '#f97316',
+    STATUS: '#64748b',
   },
 };
 
 // ========== State ==========
 const state = {
-  agents: {},
-  kanban: { ready: [], running: [], blocked: [], done: [] },
-  blackboards: {},
-  memory: { selectedAgent: 'hermes', stats: {}, trend: [] },
-  wiki: [],
+  agents: [],
+  signals: [],
+  tasks: [],
+  selectedTaskId: null,
   lastUpdated: null,
-  loading: {},
-  errors: {},
 };
 
 // ========== Utilities ==========
@@ -44,20 +50,20 @@ function $(sel, ctx) { return (ctx || document).querySelector(sel); }
 
 function $$(sel, ctx) { return Array.from((ctx || document).querySelectorAll(sel)); }
 
-function fetchWithTimeout(url, timeout = CONFIG.timeout) {
-  const ac = new AbortController();
-  const timer = setTimeout(() => ac.abort(), timeout);
-  return fetch(url, { signal: ac.signal })
-    .then(r => r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`))
-    .finally(() => clearTimeout(timer));
+function nousFetch(path) {
+  return fetch(`${CONFIG.NOUS_API}${path}`, {
+    headers: { 'Authorization': `Bearer ${CONFIG.NOUS_TOKEN}` },
+    signal: AbortSignal.timeout(CONFIG.timeout),
+  }).then(r => r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`));
 }
 
-function elapsed(timestamp) {
-  if (!timestamp) return '';
-  const sec = Math.floor((Date.now() - new Date(timestamp).getTime()) / 1000);
-  if (sec < 60) return `${sec}s ago`;
-  if (sec < 3600) return `${Math.floor(sec / 60)}m ago`;
-  return `${Math.floor(sec / 3600)}h ago`;
+function elapsed(iso) {
+  if (!iso) return '';
+  const sec = Math.floor((Date.now() - new Date(iso + 'Z').getTime()) / 1000);
+  if (sec < 60) return `${sec}s`;
+  if (sec < 3600) return `${Math.floor(sec / 60)}m`;
+  if (sec < 86400) return `${Math.floor(sec / 3600)}h`;
+  return `${Math.floor(sec / 86400)}d`;
 }
 
 function escapeHtml(str) {
@@ -66,79 +72,31 @@ function escapeHtml(str) {
   return d.innerHTML;
 }
 
-// ========== SVG Sparkline ==========
-
-function sparkline(data, options = {}) {
-  const {
-    width = '100%',
-    height = 40,
-    color = '#3b82f6',
-    fillOpacity = 0.08,
-    strokeWidth = 2,
-    showAxis = false,
-  } = options;
-
-  if (!data || data.length < 2) {
-    return `<svg width="${width}" height="${height}" viewBox="0 0 200 ${height}" xmlns="http://www.w3.org/2000/svg">
-      <text x="100" y="${height / 2 + 4}" text-anchor="middle" fill="#64748b" font-size="11">No data</text>
-    </svg>`;
-  }
-
-  const values = data.map(d => d.avg_decay ?? d);
-  const max = Math.max(...values);
-  const min = Math.min(...values);
-  const range = max - min || 1;
-  const vw = 200;
-  const vh = height;
-  const pad = 2;
-  const pw = vw - pad * 2;
-  const ph = vh - pad * 2;
-
-  // Build path
-  const pts = values.map((v, i) => {
-    const x = pad + (i / (values.length - 1)) * pw;
-    const y = pad + ph - ((v - min) / range) * ph;
-    return `${x},${y}`;
-  }).join(' ');
-
-  // Fill area path
-  const firstX = pad;
-  const lastX = pad + pw;
-  const baseY = pad + ph;
-  const fillPts = `${firstX},${baseY} ${pts} ${lastX},${baseY}`;
-
-  // Labels
-  const labelY = pad + 10;
-  const labelY2 = pad + ph - 2;
-
-  const labels = showAxis ? `
-    <text x="${pad + 2}" y="${labelY}" fill="#64748b" font-size="9">${max.toFixed(2)}</text>
-    <text x="${pad + 2}" y="${labelY2}" fill="#64748b" font-size="9">${min.toFixed(2)}</text>
-  ` : '';
-
-  return `<svg width="${width}" height="${height}" viewBox="0 0 ${vw} ${vh}" xmlns="http://www.w3.org/2000/svg">
-    <polygon points="${fillPts}" fill="${color}" fill-opacity="${fillOpacity}" />
-    <polyline points="${pts}" fill="none" stroke="${color}" stroke-width="${strokeWidth}" stroke-linejoin="round" stroke-linecap="round" />
-    ${labels}
-  </svg>`;
+function formatTime(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso + 'Z');
+  return d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
 }
 
-// ========== M1: Agent Status ==========
+// ========== M1: Agent Registry ==========
 
-function renderAgentCard(agent) {
-  const s = state.agents[agent.id];
-  const online = s && s.status === 'ok';
-  const statusClass = online ? 'online' : 'offline';
-  const platform = s ? (s.platform || '—') : '—';
+function renderAgentCard(a) {
+  const hb = a.heartbeat_status || 'gray';
+  const statusDot = hb === 'green' ? 'online' : (hb === 'yellow' ? 'warn' : 'offline');
+  const color = a.color || '#3b82f6';
   return `
-    <div class="agent-card ${online ? '' : 'offline'}">
-      <div class="agent-color-bar" style="background:${agent.color}"></div>
-      <div class="agent-status-dot ${statusClass}"></div>
+    <div class="agent-card ${hb === 'red' ? 'offline' : ''}">
+      <div class="agent-color-bar" style="background:${color}"></div>
+      <div class="agent-status-dot ${statusDot}" style="${hb === 'yellow' ? 'background:#f59e0b;box-shadow:0 0 6px rgba(245,158,11,0.4)' : ''}"></div>
       <div class="agent-info">
-        <div class="agent-name">${agent.name}</div>
-        <div class="agent-platform">${escapeHtml(platform)}</div>
+        <div class="agent-name">${escapeHtml(a.display_name || a.name)}</div>
+        <div class="agent-role">${escapeHtml(a.role || '—')}</div>
       </div>
-      <span class="agent-port">:${agent.port}</span>
+      <div class="agent-details">
+        ${a.current_task_id ? `<span class="agent-task">${escapeHtml(a.current_task_id)}</span>` : '<span class="agent-task idle">idle</span>'}
+        <span class="agent-heartbeat ${hb}">${formatTime(a.last_heartbeat)}</span>
+      </div>
+      <span class="agent-port">:${a.gateway_port}</span>
     </div>
   `;
 }
@@ -146,280 +104,222 @@ function renderAgentCard(agent) {
 function renderM1() {
   const el = $('#m1-body');
   if (!el) return;
-  el.innerHTML = `<div class="agent-row">${CONFIG.agents.map(renderAgentCard).join('')}</div>`;
+
+  if (!state.agents.length) {
+    el.innerHTML = '<div class="error-state"><div class="error-icon">!</div>No agent data</div>';
+    return;
+  }
+
+  el.innerHTML = `<div class="agent-registry-grid">${state.agents.map(renderAgentCard).join('')}</div>`;
 }
 
 async function fetchM1() {
   try {
-    const data = await fetchWithTimeout(`${CONFIG.selfmind}/api/proxy/agents`);
-    // Map proxy response to state.agents format: {id: {status, platform}}
-    CONFIG.agents.forEach(a => {
-      const agentData = data[a.id];
-      state.agents[a.id] = agentData && agentData.status === 'ok' ? agentData : null;
-    });
+    const data = await nousFetch('/api/agents');
+    state.agents = data.agents || [];
   } catch {
-    CONFIG.agents.forEach(a => { state.agents[a.id] = null; });
+    state.agents = [];
   }
   renderM1();
 }
 
-// ========== M2: Kanban ==========
+// ========== M6: Signal Timeline ==========
 
-const KANBAN_STATUS_MAP = {
-  'todo': 'ready',
-  'ready': 'ready',
-  'running': 'running',
-  'blocked': 'blocked',
-  'done': 'done',
-};
+function renderSignalNode(s) {
+  const icon = CONFIG.signalLabels[s.signal_type] || '•';
+  const color = CONFIG.signalColors[s.signal_type] || '#64748b';
+  const fromName = state.agents.find(a => a.agent_id === s.from_agent)?.display_name || s.from_agent;
+  const toName = s.to_agent ? (state.agents.find(a => a.agent_id === s.to_agent)?.display_name || s.to_agent) : null;
 
-const KANBAN_COLORS = {
-  ready: '#3b82f6',
+  let highlightClass = '';
+  if (s.signal_type === 'BLOCKED') highlightClass = ' signal-highlight-red';
+  else if (s.signal_type === 'REPAIR') highlightClass = ' signal-highlight-orange';
+
+  return `
+    <div class="signal-node${highlightClass}">
+      <div class="signal-line"></div>
+      <div class="signal-dot" style="background:${color}">${icon}</div>
+      <div class="signal-content">
+        <div class="signal-header">
+          <span class="signal-type" style="color:${color}">${s.signal_type}</span>
+          <span class="signal-from">${escapeHtml(fromName)}</span>
+          ${toName ? `<span class="signal-arrow">→</span><span class="signal-to">${escapeHtml(toName)}</span>` : '<span class="signal-to">(broadcast)</span>'}
+          ${s.task_id ? `<span class="signal-task">${escapeHtml(s.task_id)}</span>` : ''}
+          <span class="signal-time">${formatTime(s.created_at)}</span>
+        </div>
+        <div class="signal-body">${escapeHtml(s.content || '')}</div>
+      </div>
+    </div>
+  `;
+}
+
+function renderM6() {
+  const el = $('#m6-body');
+  if (!el) return;
+
+  const signals = state.signals;
+  if (!signals.length) {
+    el.innerHTML = '<div class="event-empty">No signals recorded</div>';
+    return;
+  }
+
+  el.innerHTML = `<div class="signal-timeline">${signals.map(renderSignalNode).join('')}</div>`;
+}
+
+function applySignalFilters() {
+  // Re-fetch with filter params
+  const typeFilter = $('#signal-type-filter').value;
+  const agentFilter = $('#signal-agent-filter').value;
+  let url = '/api/signals?limit=50';
+  if (typeFilter) url += `&type=${encodeURIComponent(typeFilter)}`;
+  if (agentFilter) url += `&from_agent=${encodeURIComponent(agentFilter)}`;
+
+  const countBadge = $('#signal-count-badge');
+
+  nousFetch(url).then(data => {
+    state.signals = data.signals || [];
+    if (countBadge) countBadge.textContent = `${state.signals.length} signals`;
+    renderM6();
+  }).catch(() => {
+    state.signals = [];
+    renderM6();
+  });
+}
+
+async function fetchM6() {
+  const countBadge = $('#signal-count-badge');
+  try {
+    const data = await nousFetch('/api/signals?limit=50');
+    state.signals = data.signals || [];
+    if (countBadge) countBadge.textContent = `${state.signals.length} signals`;
+  } catch {
+    state.signals = [];
+  }
+  renderM6();
+}
+
+// ========== M2: Task Lifecycle + Events ==========
+
+const TASK_STATUS_COLORS = {
+  backlog: '#3b82f6',
   running: '#f59e0b',
   blocked: '#ef4444',
   done: '#22c55e',
+  unknown: '#64748b',
 };
 
-function renderKanbanTasks(tasks) {
-  const columns = { ready: [], running: [], blocked: [], done: [] };
-  (tasks || []).forEach(t => {
-    const col = KANBAN_STATUS_MAP[t.status] || 'ready';
-    columns[col].push(t);
-  });
-
-  return Object.entries(columns).map(([col, items]) => `
-    <div class="kanban-column">
-      <div class="kanban-column-header">
-        <span style="color:${KANBAN_COLORS[col]}">${col}</span>
-        <span class="count">${items.length}</span>
+function renderTaskCard(t) {
+  const color = TASK_STATUS_COLORS[t.status] || '#64748b';
+  const isBlocked = t.status === 'blocked';
+  const selected = state.selectedTaskId === t.id;
+  return `
+    <div class="kanban-task ${isBlocked ? 'task-blocked' : ''} ${selected ? 'task-selected' : ''}"
+         onclick="selectTask('${t.id}')">
+      <div class="task-color-bar" style="background:${color}"></div>
+      <div class="task-title">${escapeHtml(t.title)}</div>
+      <div class="task-meta">
+        <span class="task-assignee">${escapeHtml(t.assignee || '—')}</span>
+        <span class="task-id">${escapeHtml(t.id)}</span>
+        ${isBlocked ? '<span class="task-blocked-badge">BLOCKED</span>' : ''}
       </div>
-      ${items.length === 0
-        ? '<div class="kanban-empty">—</div>'
-        : items.map(t => `
-          <div class="kanban-task">
-            <div class="task-title">${escapeHtml(t.title)}</div>
-            <div class="task-meta">
-              <span class="task-assignee">${escapeHtml(t.assignee || '—')}</span>
-              <span>${t.created_at ? elapsed(new Date(t.created_at * 1000).toISOString()) : ''}</span>
-            </div>
-          </div>
-        `).join('')
-      }
     </div>
-  `).join('');
+  `;
 }
 
 function renderM2() {
   const el = $('#m2-body');
   if (!el) return;
-  const { ready, running, blocked, done } = state.kanban;
-  const allTasks = [...ready, ...running, ...blocked, ...done];
-  el.innerHTML = `<div class="kanban-board">${renderKanbanTasks(allTasks)}</div>`;
-}
 
-async function fetchM2() {
-  try {
-    const data = await fetchWithTimeout(`${CONFIG.selfmind}/api/kanban/tasks`);
-    const tasks = data.tasks || [];
-    // Re-sort into buckets
-    const buckets = { ready: [], running: [], blocked: [], done: [] };
-    tasks.forEach(t => {
-      const col = KANBAN_STATUS_MAP[t.status] || 'ready';
-      buckets[col].push(t);
-    });
-    state.kanban = buckets;
-  } catch {
-    state.kanban = { ready: [], running: [], blocked: [], done: [] };
+  const tasks = state.tasks;
+  const columns = { backlog: [], running: [], blocked: [], done: [] };
+  tasks.forEach(t => {
+    const col = t.status in columns ? t.status : 'backlog';
+    columns[col].push(t);
+  });
+
+  el.innerHTML = `<div class="kanban-board">${Object.entries(columns).map(([col, items]) => `
+    <div class="kanban-column">
+      <div class="kanban-column-header">
+        <span style="color:${TASK_STATUS_COLORS[col]}">${col}</span>
+        <span class="count">${items.length}</span>
+      </div>
+      ${items.length === 0
+        ? '<div class="kanban-empty">—</div>'
+        : items.map(renderTaskCard).join('')
+      }
+    </div>
+  `).join('')}</div>`;
+
+  // If there's a selected task, re-render its events
+  if (state.selectedTaskId) {
+    renderTaskEvents(state.selectedTaskId);
   }
-  renderM2();
 }
 
-// ========== M3: Blackboard ==========
-
-function renderNoticeItem(notice) {
-  // Try to extract a tag from frontmatter
-  const tagMatch = notice.content && notice.content.match(/^(\w+):/);
-  const tag = tagMatch ? tagMatch[1] : (notice.type || 'info');
-  return `<div class="notice-item"><span class="notice-tag">${escapeHtml(tag)}</span>${escapeHtml(notice.content || '')}</div>`;
-}
-
-function renderM3() {
-  const el = $('#m3-body');
-  if (!el) return;
-
-  const boards = state.blackboards.boards || {};
-  const entries = Object.entries(boards);
-
-  if (entries.length === 0) {
-    el.innerHTML = '<div class="notice-empty">No blackboard notices yet</div>';
+function renderTaskEvents(taskId) {
+  const el = $('#m2-events-body');
+  const task = state.tasks.find(t => t.id === taskId);
+  if (!task) {
+    el.innerHTML = '<div class="event-empty">Task not found</div>';
     return;
   }
 
-  el.innerHTML = `<div class="blackboard-list">${entries.map(([name, board]) => {
-    const notices = board || [];
-    const boardLabel = name.replace(/^for-/, '').replace('.md', '');
+  const label = $('#selected-task-label');
+  if (label) label.textContent = task.id;
+
+  const events = task.events || [];
+  if (!events.length) {
+    el.innerHTML = '<div class="event-empty">No events recorded</div>';
+    return;
+  }
+
+  const EVENT_BY_TYPE = {
+    created: '📋 created',
+    assigned: '👤 assigned',
+    claimed: '✋ claimed',
+    started: '▶ started',
+    blocked: '🚫 blocked',
+    completed: '✅ completed',
+    reviewed: '🔍 reviewed',
+    accepted: '🎉 accepted',
+    rejected: '❌ rejected',
+    reassigned: '🔄 reassigned',
+    progress: '📊 progress',
+  };
+
+  el.innerHTML = `<div class="event-flow">${events.map((e, i) => {
+    const label = EVENT_BY_TYPE[e.event_type] || e.event_type;
+    const agentName = e.agent_id ? (state.agents.find(a => a.agent_id === e.agent_id)?.display_name || e.agent_id) : '';
     return `
-      <div class="board-item">
-        <div class="board-item-header" onclick="toggleBlackboard(this)">
-          <span class="expand-icon">▶</span>
-          <span>${escapeHtml(boardLabel)}</span>
-          <span style="margin-left:auto;font-size:0.7rem;color:var(--text-muted)">${notices.length} notices</span>
-        </div>
-        <div class="board-notices expanded">
-          ${notices.length === 0
-            ? '<div class="notice-empty">No notices</div>'
-            : notices.map(renderNoticeItem).join('')
-          }
+      <div class="event-item ${e.event_type === 'blocked' ? 'event-blocked' : ''}">
+        <div class="event-dot" style="background:${e.event_type === 'blocked' ? '#ef4444' : e.event_type === 'completed' || e.event_type === 'accepted' ? '#22c55e' : '#3b82f6'}"></div>
+        <div class="event-line"></div>
+        <div class="event-info">
+          <div class="event-type">${label}</div>
+          <div class="event-meta">
+            ${agentName ? `<span class="event-agent">${escapeHtml(agentName)}</span>` : ''}
+            <span class="event-time">${formatTime(e.created_at)} (${elapsed(e.created_at)} ago)</span>
+          </div>
+          ${e.detail ? `<div class="event-detail">${escapeHtml(e.detail)}</div>` : ''}
         </div>
       </div>
     `;
   }).join('')}</div>`;
 }
 
-window.toggleBlackboard = function(header) {
-  const notices = header.nextElementSibling;
-  const icon = header.querySelector('.expand-icon');
-  if (notices) {
-    notices.classList.toggle('expanded');
-    icon.classList.toggle('expanded');
-  }
+window.selectTask = function(taskId) {
+  state.selectedTaskId = taskId;
+  renderM2(); // re-render to update selection highlight
 };
 
-async function fetchM3() {
+async function fetchM2() {
   try {
-    const data = await fetchWithTimeout(`${CONFIG.selfmind}/api/blackboard`);
-    state.blackboards = data;
+    const data = await nousFetch('/api/tasks');
+    state.tasks = data.tasks || [];
   } catch {
-    state.blackboards = { boards: {} };
+    state.tasks = [];
   }
-  renderM3();
-}
-
-// ========== M4: Memory ==========
-
-function renderMemoryTabs() {
-  return CONFIG.memoryAgents.map(a => `
-    <button class="memory-agent-tab ${a.id === state.memory.selectedAgent ? 'active' : ''}"
-            style="${a.id === state.memory.selectedAgent ? `border-color:${a.color};color:${a.color}` : ''}"
-            onclick="switchMemoryAgent('${a.id}')">
-      ${a.name}
-    </button>
-  `).join('');
-}
-
-function renderMemoryStats(stats) {
-  const levels = stats || {};
-  const items = [
-    { key: 'L1', label: 'Sessions', value: levels.L1?.metric ?? '—', cls: levels.L1?.status === 'ok' ? 'ok' : levels.L1?.status === 'err' ? 'err' : '' },
-    { key: 'L2', label: 'MEM/USER', value: levels.L2?.metric ?? '—', cls: levels.L2?.status === 'ok' ? 'ok' : levels.L2?.status === 'err' ? 'err' : 'warn' },
-    { key: 'L3', label: 'Conclusions', value: levels.L3?.metric ?? '—', cls: levels.L3?.status === 'ok' ? 'ok' : 'warn' },
-    { key: 'L4', label: 'Nodes', value: levels.L4?.metric ?? '—', cls: levels.L4?.status === 'ok' ? 'ok' : 'warn' },
-    { key: 'L5', label: 'Skills', value: levels.L5?.metric ?? '—', cls: levels.L5?.status === 'ok' ? 'ok' : 'warn' },
-    { key: 'L6', label: 'Entities', value: levels.L6?.metric ?? '—', cls: levels.L6?.status === 'ok' ? 'ok' : 'warn' },
-  ];
-  return items.map(item => `
-    <div class="stat-item">
-      <div class="stat-value ${item.cls}">${item.value}</div>
-      <div class="stat-label">${item.label}</div>
-    </div>
-  `).join('');
-}
-
-function renderM4() {
-  const el = $('#m4-body');
-  if (!el) return;
-
-  const agent = state.memory.selectedAgent;
-  const agentColor = CONFIG.agentColors[agent] || '#3b82f6';
-  const stats = state.memory.stats;
-  const trend = state.memory.trend || [];
-
-  el.innerHTML = `
-    <div class="memory-agent-tabs">${renderMemoryTabs()}</div>
-    <div class="memory-stats-grid">${renderMemoryStats(stats)}</div>
-    <div class="sparkline-container">
-      <div class="sparkline-label">Decay trend <span style="color:var(--text-muted)">(7 days)</span></div>
-      ${sparkline(trend, { color: agentColor, height: 48, showAxis: true })}
-    </div>
-  `;
-}
-
-window.switchMemoryAgent = function(agentId) {
-  state.memory.selectedAgent = agentId;
-  fetchM4Data().then(renderM4);
-};
-
-async function fetchM4Data() {
-  const agent = state.memory.selectedAgent;
-  try {
-    const [stats, trend] = await Promise.allSettled([
-      fetchWithTimeout(`${CONFIG.selfmind}/api/stats`),
-      fetchWithTimeout(`${CONFIG.selfmind}/api/decay-trend${agent !== 'hermes' ? `?agent=${agent}` : ''}`),
-    ]);
-    if (stats.status === 'fulfilled') state.memory.stats = stats.value;
-    if (trend.status === 'fulfilled') state.memory.trend = trend.value;
-  } catch {
-    // keep stale data
-  }
-}
-
-async function fetchM4() {
-  await fetchM4Data();
-  renderM4();
-}
-
-// ========== M5: Wiki ==========
-
-const CATEGORY_COLORS = [
-  '#3b82f6', '#10b981', '#f97316', '#8b5cf6',
-  '#ec4899', '#06b6d4', '#84cc16', '#f59e0b',
-];
-
-function renderWiki() {
-  const el = $('#m5-body');
-  if (!el) return;
-
-  const cats = state.wiki || [];
-
-  if (cats.length === 0) {
-    el.innerHTML = '<div class="wiki-empty">No wiki index available</div>';
-    return;
-  }
-
-  el.innerHTML = `<div class="wiki-categories">${cats.map((cat, ci) => `
-    <div>
-      <div class="wiki-category-item" onclick="toggleWikiCategory(this)">
-        <div class="cat-icon" style="background:${CATEGORY_COLORS[ci % CATEGORY_COLORS.length]}">
-          ${escapeHtml(cat.name?.charAt(0) || '?')}
-        </div>
-        <span class="cat-name">${escapeHtml(cat.name || 'Unknown')}</span>
-        <span class="cat-count">${(cat.documents || []).length}</span>
-      </div>
-      <div class="wiki-pages expanded">
-        ${(cat.documents || []).map(p => `
-          <div class="wiki-page-item">
-            <span class="page-dot"></span>
-            ${escapeHtml(p.title || p)}
-          </div>
-        `).join('')}
-      </div>
-    </div>
-  `).join('')}</div>`;
-}
-
-window.toggleWikiCategory = function(item) {
-  const pages = item.nextElementSibling;
-  if (pages) pages.classList.toggle('expanded');
-};
-
-async function fetchM5() {
-  try {
-    const data = await fetchWithTimeout(`${CONFIG.selfmind}/api/wiki/index`);
-    state.wiki = data.categories || [];
-  } catch {
-    state.wiki = [];
-  }
-  renderWiki();
+  renderM2();
 }
 
 // ========== Poller ==========
@@ -434,23 +334,17 @@ function updateLastUpdated() {
 async function refreshAll() {
   updateLastUpdated();
 
-  // Parallel fetch all modules
   await Promise.allSettled([
     fetchM1(),
+    fetchM6(),
     fetchM2(),
-    fetchM3(),
-    fetchM4(),
-    fetchM5(),
   ]);
 }
 
 // ========== Init ==========
 
 function init() {
-  // Render skeletons
   refreshAll();
-
-  // Start polling
   setInterval(refreshAll, CONFIG.refreshInterval);
 }
 

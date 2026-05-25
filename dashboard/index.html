@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Nous Dashboard</title>
-  <link rel="stylesheet" href="style.css?v=20260525b">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>Δ</text></svg>">
+  <title>Nous Dashboard v2</title>
+  <link rel="stylesheet" href="style.css?v=20260525c">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#8710;</text></svg>">
 </head>
 <body>
 
@@ -17,7 +17,8 @@
         <path d="M2 17l10 5 10-5"/>
         <path d="M2 12l10 5 10-5"/>
       </svg>
-      <h1>Nous Dashboard</h1>
+      <h1>Nous Dashboard v2</h1>
+      <span class="version-badge">alpha</span>
     </div>
     <div class="header-right">
       <div class="refresh-status">
@@ -31,88 +32,72 @@
   <!-- ========== Dashboard Grid ========== -->
   <div class="dashboard-grid">
 
-    <!-- M1: Agent Status -->
+    <!-- M1: Agent Registry (Enhanced) -->
     <div class="card card-full">
       <div class="card-header">
-        <h2>🤖 Agent Status</h2>
-        <span class="badge">30s refresh</span>
+        <h2>Agent Registry</h2>
+        <span class="badge">heartbeat</span>
       </div>
       <div class="card-body" id="m1-body">
-        <div class="loading-pulse">
-          <span class="pulse-dot"></span>
-          <span class="pulse-dot"></span>
-          <span class="pulse-dot"></span>
-          <span style="margin-left:8px">Checking agents...</span>
-        </div>
+        <div class="loading-pulse"><span class="pulse-dot"></span><span class="pulse-dot"></span><span class="pulse-dot"></span><span style="margin-left:8px">Checking agents...</span></div>
       </div>
     </div>
 
-    <!-- M2: Kanban Board (left column) -->
+    <!-- M6: Signal Timeline (new core module) -->
+    <div class="card card-full">
+      <div class="card-header">
+        <h2>Signal Timeline</h2>
+        <div class="card-header-right">
+          <select id="signal-type-filter" class="filter-select" onchange="applySignalFilters()">
+            <option value="">All Types</option>
+            <option value="HEARTBEAT">HEARTBEAT</option>
+            <option value="DONE">DONE</option>
+            <option value="BLOCKED">BLOCKED</option>
+            <option value="ASK:arch">ASK:arch</option>
+            <option value="ASK:impl">ASK:impl</option>
+            <option value="SYNC">SYNC</option>
+            <option value="REPAIR">REPAIR</option>
+            <option value="STATUS">STATUS</option>
+          </select>
+          <select id="signal-agent-filter" class="filter-select" onchange="applySignalFilters()">
+            <option value="">All Agents</option>
+            <option value="socrates">苏格拉底</option>
+            <option value="aris">小亚</option>
+            <option value="plato">柏拉图</option>
+            <option value="grace">Grace</option>
+          </select>
+          <span class="badge" id="signal-count-badge">0 signals</span>
+        </div>
+      </div>
+      <div class="card-body" id="m6-body">
+        <div class="loading-pulse"><span class="pulse-dot"></span><span class="pulse-dot"></span><span class="pulse-dot"></span><span style="margin-left:8px">Loading signals...</span></div>
+      </div>
+    </div>
+
+    <!-- M2: Task Lifecycle (left column) -->
     <div class="card">
       <div class="card-header">
-        <h2>📋 Task Board</h2>
+        <h2>Task Lifecycle</h2>
         <span class="badge">kanban</span>
       </div>
       <div class="card-body" id="m2-body">
-        <div class="loading-pulse">
-          <span class="pulse-dot"></span>
-          <span class="pulse-dot"></span>
-          <span class="pulse-dot"></span>
-          <span style="margin-left:8px">Loading tasks...</span>
-        </div>
+        <div class="loading-pulse"><span class="pulse-dot"></span><span class="pulse-dot"></span><span class="pulse-dot"></span><span style="margin-left:8px">Loading tasks...</span></div>
       </div>
     </div>
 
-    <!-- M4: Memory Overview (right column) -->
+    <!-- Task Event Detail Panel (right column) -->
     <div class="card">
       <div class="card-header">
-        <h2>🧠 Memory Overview</h2>
-        <span class="badge">selfmind</span>
+        <h2>Event Timeline</h2>
+        <span class="badge" id="selected-task-label">select a task</span>
       </div>
-      <div class="card-body" id="m4-body">
-        <div class="loading-pulse">
-          <span class="pulse-dot"></span>
-          <span class="pulse-dot"></span>
-          <span class="pulse-dot"></span>
-          <span style="margin-left:8px">Loading memory data...</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- M3: Blackboard -->
-    <div class="card">
-      <div class="card-header">
-        <h2>📢 Blackboard</h2>
-        <span class="badge">notices</span>
-      </div>
-      <div class="card-body" id="m3-body">
-        <div class="loading-pulse">
-          <span class="pulse-dot"></span>
-          <span class="pulse-dot"></span>
-          <span class="pulse-dot"></span>
-          <span style="margin-left:8px">Loading notices...</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- M5: Wiki Index -->
-    <div class="card">
-      <div class="card-header">
-        <h2>📚 Wiki Index</h2>
-        <span class="badge">knowledge</span>
-      </div>
-      <div class="card-body" id="m5-body">
-        <div class="loading-pulse">
-          <span class="pulse-dot"></span>
-          <span class="pulse-dot"></span>
-          <span class="pulse-dot"></span>
-          <span style="margin-left:8px">Loading wiki...</span>
-        </div>
+      <div class="card-body" id="m2-events-body">
+        <div class="event-empty">Click a task to see its lifecycle events</div>
       </div>
     </div>
 
   </div>
 
-  <script src="app.js?v=20260525b"></script>
+  <script src="app.js?v=20260525c"></script>
 </body>
 </html>

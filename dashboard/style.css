@@ -596,6 +596,336 @@ body {
 
 .error-state .error-icon { font-size: 1.4rem; margin-bottom: 6px; }
 
+/* ========== Version Badge ========== */
+.version-badge {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(59, 130, 246, 0.15);
+  color: var(--blue);
+  font-weight: 500;
+  margin-left: 6px;
+}
+
+/* ========== Filter Select ========== */
+.filter-select {
+  background: var(--bg-deep);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  padding: 4px 8px;
+  font-family: var(--font);
+  cursor: pointer;
+  outline: none;
+}
+.filter-select:hover { border-color: var(--border-light); }
+.filter-select:focus { border-color: var(--blue); }
+.card-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ========== M1: Agent Registry (Enhanced) ========== */
+.agent-registry-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 10px;
+}
+.agent-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  transition: border-color 0.15s, background 0.15s;
+}
+.agent-card:hover { border-color: var(--border-light); background: var(--bg-card-hover); }
+.agent-card.offline { border-color: rgba(239, 68, 68, 0.3); background: rgba(239, 68, 68, 0.04); }
+.agent-color-bar {
+  width: 3px;
+  align-self: stretch;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.agent-status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  position: relative;
+}
+.agent-status-dot.online { background: var(--green); box-shadow: 0 0 6px rgba(34,197,94,0.4); }
+.agent-status-dot.offline { background: var(--red); }
+.agent-status-dot.warn { background: var(--amber); box-shadow: 0 0 6px rgba(245,158,11,0.4); }
+.agent-info { flex: 1; min-width: 0; }
+.agent-name { font-size: 0.85rem; font-weight: 600; color: var(--text-primary); }
+.agent-role {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+.agent-details {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  min-width: 60px;
+}
+.agent-task {
+  font-size: 0.65rem;
+  font-family: var(--font-mono);
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--bg-deep);
+  color: var(--text-secondary);
+}
+.agent-task.idle { color: var(--text-muted); }
+.agent-heartbeat {
+  font-size: 0.6rem;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+.agent-heartbeat.red { color: var(--red); }
+.agent-heartbeat.yellow { color: var(--amber); }
+.agent-heartbeat.green { color: var(--green); }
+.agent-port {
+  font-size: 0.65rem;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  background: var(--bg-deep);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+/* ========== M6: Signal Timeline ========== */
+.signal-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 4px 0;
+}
+.signal-node {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  padding: 6px 0;
+  position: relative;
+  transition: background 0.1s;
+  padding-left: 0;
+}
+.signal-node:hover { background: var(--bg-card-hover); border-radius: var(--radius-sm); }
+.signal-line {
+  width: 2px;
+  background: var(--border);
+  margin: 0 19px;
+  flex-shrink: 0;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+}
+.signal-node:first-child .signal-line { top: 50%; }
+.signal-node:last-child .signal-line { bottom: 50%; }
+.signal-node:only-child .signal-line { display: none; }
+.signal-dot {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.6rem;
+  flex-shrink: 0;
+  z-index: 1;
+  margin-right: 10px;
+  position: relative;
+}
+.signal-content {
+  flex: 1;
+  min-width: 0;
+}
+.signal-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.signal-type {
+  font-size: 0.65rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.signal-from, .signal-to {
+  font-size: 0.75rem;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+.signal-arrow {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+.signal-task {
+  font-size: 0.6rem;
+  font-family: var(--font-mono);
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--bg-deep);
+  color: var(--text-muted);
+}
+.signal-time {
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  margin-left: auto;
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+.signal-body {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-top: 3px;
+  line-height: 1.4;
+}
+.signal-highlight-red {
+  background: rgba(239, 68, 68, 0.05);
+  border-radius: var(--radius-sm);
+}
+.signal-highlight-orange {
+  background: rgba(249, 115, 22, 0.05);
+  border-radius: var(--radius-sm);
+}
+
+/* ========== M2: Task Lifecycle (Enhanced) ========== */
+.kanban-task {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  position: relative;
+}
+.kanban-task:hover { border-color: var(--border-light); }
+.kanban-task.task-selected {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 1px var(--blue);
+}
+.kanban-task.task-blocked {
+  border-color: rgba(239, 68, 68, 0.4);
+  background: rgba(239, 68, 68, 0.04);
+}
+.task-color-bar {
+  width: 100%;
+  height: 2px;
+  border-radius: 1px;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+}
+.task-title {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 1.4;
+  padding-top: 2px;
+}
+.task-blocked-badge {
+  font-size: 0.55rem;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--red-bg);
+  color: var(--red);
+  letter-spacing: 0.04em;
+}
+
+/* ========== Task Event Flow (Right Panel) ========== */
+.event-flow {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.event-item {
+  display: flex;
+  gap: 8px;
+  padding: 8px 0;
+  position: relative;
+  align-items: flex-start;
+}
+.event-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 4px;
+  z-index: 1;
+}
+.event-line {
+  width: 2px;
+  background: var(--border);
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 4px;
+}
+.event-item:first-child .event-line { top: 14px; }
+.event-item:last-child .event-line { bottom: auto; height: 14px; }
+.event-item:only-child .event-line { display: none; }
+.event-info { flex: 1; min-width: 0; }
+.event-type {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.event-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+.event-agent {
+  font-family: var(--font-mono);
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--bg-deep);
+  color: var(--text-secondary);
+}
+.event-time { font-family: var(--font-mono); }
+.event-detail {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  margin-top: 4px;
+  padding: 6px 8px;
+  background: var(--bg-deep);
+  border-radius: var(--radius-sm);
+  border-left: 2px solid var(--border);
+  line-height: 1.4;
+}
+.event-blocked .event-detail {
+  border-left-color: var(--red);
+  background: rgba(239, 68, 68, 0.06);
+}
+.event-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
 /* ========== Responsive ========== */
 @media (max-width: 1024px) {
   .dashboard-grid {
