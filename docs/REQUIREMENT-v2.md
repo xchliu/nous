@@ -39,8 +39,8 @@ Dashboard只是Nous的一个视图层，不是核心。核心是数据层+通信
 
 | 字段 | 来源 | 说明 |
 |------|------|------|
-| agent_id | 注册时指定 | hermes/aris/plato/grace/openclaw |
-| name | 注册时指定 | 苏哥/小亚/柏拉图/Grace/OpenClaw |
+| agent_id | 注册时指定 | hermes/aris/plato |
+| name | 注册时指定 | 苏哥/小亚/柏拉图 |
 | role | 注册时指定 | PM/Developer/Architect/... |
 | gateway_url | 注册时指定 | http://localhost:8642 等 |
 | status | 心跳探活 | online/offline/error |

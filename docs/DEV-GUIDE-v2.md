@@ -110,7 +110,7 @@ seed.py 生成以下 mock 数据：
 - socrates (苏哥, PM, 8642, #2563eb)
 - aris (小亚, Dev, 8643, #10b981)
 - plato (柏拉图, Arch, 8645, #f97316)
-- grace (Grace, Aux, 8644, #f59e0b)
+- plato (柏拉图, Architect, 8645, #e17055)
 
 **模拟信号时间线（最近24小时）：**
 - 每个agent 3-5条 HEARTBEAT
