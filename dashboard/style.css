@@ -1,0 +1,619 @@
+/* ============================================
+   Nous Dashboard — Dark Theme (Linear Style)
+   ============================================ */
+
+:root {
+  --bg-deep: #0b0f1a;
+  --bg-main: #0f172a;
+  --bg-card: #1a2333;
+  --bg-card-hover: #1e293b;
+  --bg-sidebar: #0f172a;
+  --border: #2a3444;
+  --border-light: #334155;
+
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+
+  /* Status colors */
+  --green: #22c55e;
+  --green-bg: rgba(34, 197, 94, 0.12);
+  --red: #ef4444;
+  --red-bg: rgba(239, 68, 68, 0.12);
+  --amber: #f59e0b;
+  --amber-bg: rgba(245, 158, 11, 0.12);
+  --blue: #3b82f6;
+  --blue-bg: rgba(59, 130, 246, 0.12);
+
+  /* Agent colors */
+  --c-hermes: #2563eb;
+  --c-aris: #10b981;
+  --c-plato: #f97316;
+  --c-grace: #f59e0b;
+  --c-gateway: #8b5cf6;
+
+  --radius: 10px;
+  --radius-sm: 6px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+  --shadow-lg: 0 4px 12px rgba(0,0,0,0.4);
+
+  --font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { font-size: 14px; }
+body {
+  font-family: var(--font);
+  background: var(--bg-main);
+  color: var(--text-primary);
+  line-height: 1.5;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ========== Scrollbar ========== */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-light); }
+
+/* ========== Header ========== */
+.dashboard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 28px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-deep);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.dashboard-header .brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dashboard-header .brand svg {
+  width: 22px;
+  height: 22px;
+}
+
+.dashboard-header h1 {
+  font-size: 1.15rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.dashboard-header .header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.refresh-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.refresh-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.refresh-dot.offline { background: var(--red); animation: none; }
+
+.last-updated {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ========== Dashboard Grid ========== */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  padding: 20px 28px;
+  max-width: 1440px;
+  margin: 0 auto;
+}
+
+/* ========== Cards ========== */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.card-header h2 {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.card-header .badge {
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  border-radius: 20px;
+  background: var(--border);
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.card-body {
+  padding: 16px 18px;
+}
+
+/* Full-width modules */
+.card-full { grid-column: 1 / -1; }
+
+/* ========== M1: Agent Cards ========== */
+.agent-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.agent-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.agent-card:hover { border-color: var(--border-light); background: var(--bg-card-hover); }
+
+.agent-card.offline {
+  border-color: rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.04);
+}
+
+.agent-status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.agent-status-dot.online { background: var(--green); box-shadow: 0 0 6px rgba(34, 197, 94, 0.4); }
+.agent-status-dot.offline { background: var(--red); }
+
+.agent-info { flex: 1; min-width: 0; }
+
+.agent-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.agent-platform {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.agent-port {
+  font-size: 0.65rem;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  background: var(--bg-deep);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.agent-card .agent-color-bar {
+  width: 3px;
+  align-self: stretch;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+/* ========== M2: Kanban Board ========== */
+.kanban-board {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  min-height: 200px;
+}
+
+.kanban-column {
+  background: var(--bg-deep);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+}
+
+.kanban-column-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 4px 10px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.kanban-column-header .count {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: var(--border);
+  padding: 1px 7px;
+  border-radius: 10px;
+}
+
+.kanban-task {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  cursor: default;
+  transition: border-color 0.15s;
+}
+
+.kanban-task:hover { border-color: var(--border-light); }
+
+.kanban-task .task-title {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.kanban-task .task-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.kanban-task .task-assignee {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  background: var(--bg-deep);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.kanban-empty {
+  text-align: center;
+  padding: 30px 10px;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+/* ========== M3: Blackboard ========== */
+.blackboard-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.board-item {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.board-item-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--bg-deep);
+  cursor: pointer;
+  user-select: none;
+  font-size: 0.82rem;
+  font-weight: 500;
+  transition: background 0.15s;
+}
+
+.board-item-header:hover { background: var(--bg-card-hover); }
+
+.board-item-header .expand-icon {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  transition: transform 0.2s;
+}
+
+.board-item-header .expand-icon.expanded { transform: rotate(90deg); }
+
+.board-notices {
+  padding: 0 12px;
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.25s ease, padding 0.25s ease;
+}
+
+.board-notices.expanded {
+  max-height: 500px;
+  padding: 8px 12px 12px;
+}
+
+.notice-item {
+  font-size: 0.78rem;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.notice-item:last-child { border-bottom: none; }
+
+.notice-item .notice-tag {
+  display: inline-block;
+  font-size: 0.65rem;
+  font-weight: 500;
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-right: 6px;
+  background: var(--blue-bg);
+  color: var(--blue);
+}
+
+.notice-empty {
+  text-align: center;
+  padding: 20px;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+/* ========== M4: Memory ========== */
+.memory-agent-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.memory-agent-tab {
+  padding: 5px 14px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  transition: all 0.15s;
+}
+
+.memory-agent-tab:hover {
+  border-color: var(--border-light);
+  color: var(--text-primary);
+}
+
+.memory-agent-tab.active {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+  border-color: var(--border-light);
+}
+
+.memory-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.stat-item {
+  background: var(--bg-deep);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  text-align: center;
+}
+
+.stat-item .stat-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-item .stat-label {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.stat-item .stat-value.ok { color: var(--green); }
+.stat-item .stat-value.err { color: var(--red); }
+.stat-item .stat-value.warn { color: var(--amber); }
+
+.sparkline-container {
+  background: var(--bg-deep);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  position: relative;
+}
+
+.sparkline-container svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.sparkline-label {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+/* ========== M5: Wiki ========== */
+.wiki-categories {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wiki-category-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.wiki-category-item:hover { background: var(--bg-card-hover); }
+
+.wiki-category-item .cat-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.55rem;
+  font-weight: 600;
+  color: white;
+  flex-shrink: 0;
+}
+
+.wiki-category-item .cat-name {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  flex: 1;
+}
+
+.wiki-category-item .cat-count {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.wiki-pages {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.25s ease;
+}
+
+.wiki-pages.expanded {
+  max-height: 600px;
+}
+
+.wiki-page-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px 5px 42px;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  transition: color 0.15s;
+}
+
+.wiki-page-item:hover { color: var(--text-primary); }
+
+.wiki-page-item .page-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.wiki-empty {
+  text-align: center;
+  padding: 30px;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+/* ========== Loading & Error States ========== */
+.loading-pulse {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 30px;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.loading-pulse .pulse-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--border-light);
+  animation: pulse-bar 1.4s ease-in-out infinite;
+}
+
+.loading-pulse .pulse-dot:nth-child(2) { animation-delay: 0.2s; }
+.loading-pulse .pulse-dot:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes pulse-bar {
+  0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
+  40% { opacity: 1; transform: scale(1); }
+}
+
+.error-state {
+  text-align: center;
+  padding: 20px;
+  color: var(--red);
+  font-size: 0.75rem;
+}
+
+.error-state .error-icon { font-size: 1.4rem; margin-bottom: 6px; }
+
+/* ========== Responsive ========== */
+@media (max-width: 1024px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+    padding: 16px;
+  }
+  .kanban-board {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .memory-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .dashboard-grid { padding: 12px; }
+  .dashboard-header { padding: 12px 16px; flex-wrap: wrap; gap: 8px; }
+  .agent-row { grid-template-columns: 1fr 1fr; }
+  .kanban-board { grid-template-columns: 1fr; }
+  .memory-stats-grid { grid-template-columns: 1fr; }
+}

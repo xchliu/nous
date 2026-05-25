@@ -1,18 +1,118 @@
-# Nous 团队协作空间
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nous Dashboard</title>
+  <link rel="stylesheet" href="style.css?v=20260525b">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>Δ</text></svg>">
+</head>
+<body>
 
-这是一个AI团队的协作项目仓库。当前第一个产品是 Team Dashboard。
+  <!-- ========== Header ========== -->
+  <header class="dashboard-header">
+    <div class="brand">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+        <path d="M2 17l10 5 10-5"/>
+        <path d="M2 12l10 5 10-5"/>
+      </svg>
+      <h1>Nous Dashboard</h1>
+    </div>
+    <div class="header-right">
+      <div class="refresh-status">
+        <span class="refresh-dot" id="refresh-dot"></span>
+        <span>Auto-refresh</span>
+      </div>
+      <span class="last-updated" id="last-updated">—</span>
+    </div>
+  </header>
 
-## 快速开始
+  <!-- ========== Dashboard Grid ========== -->
+  <div class="dashboard-grid">
 
-1. 打开 `dashboard/index.html` 即可使用 Team Dashboard
-2. 确保以下服务运行中：
-   - Hermes gateway (默认端口)
-   - 小亚 gateway (:8643)
-   - 柏拉图 gateway (:8645)
-   - SelfMind (:3002)
+    <!-- M1: Agent Status -->
+    <div class="card card-full">
+      <div class="card-header">
+        <h2>🤖 Agent Status</h2>
+        <span class="badge">30s refresh</span>
+      </div>
+      <div class="card-body" id="m1-body">
+        <div class="loading-pulse">
+          <span class="pulse-dot"></span>
+          <span class="pulse-dot"></span>
+          <span class="pulse-dot"></span>
+          <span style="margin-left:8px">Checking agents...</span>
+        </div>
+      </div>
+    </div>
 
-## 文档
+    <!-- M2: Kanban Board (left column) -->
+    <div class="card">
+      <div class="card-header">
+        <h2>📋 Task Board</h2>
+        <span class="badge">kanban</span>
+      </div>
+      <div class="card-body" id="m2-body">
+        <div class="loading-pulse">
+          <span class="pulse-dot"></span>
+          <span class="pulse-dot"></span>
+          <span class="pulse-dot"></span>
+          <span style="margin-left:8px">Loading tasks...</span>
+        </div>
+      </div>
+    </div>
 
-- [宣言](docs/manifesto.md) — Nous团队信念、文化和行事准则
-- [0到1记录](docs/from-zero-to-one.md) — 团队诞生过程
-- [Team Dashboard需求](docs/team-dashboard/REQUIREMENT.md) — 第一个产品需求文档
+    <!-- M4: Memory Overview (right column) -->
+    <div class="card">
+      <div class="card-header">
+        <h2>🧠 Memory Overview</h2>
+        <span class="badge">selfmind</span>
+      </div>
+      <div class="card-body" id="m4-body">
+        <div class="loading-pulse">
+          <span class="pulse-dot"></span>
+          <span class="pulse-dot"></span>
+          <span class="pulse-dot"></span>
+          <span style="margin-left:8px">Loading memory data...</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- M3: Blackboard -->
+    <div class="card">
+      <div class="card-header">
+        <h2>📢 Blackboard</h2>
+        <span class="badge">notices</span>
+      </div>
+      <div class="card-body" id="m3-body">
+        <div class="loading-pulse">
+          <span class="pulse-dot"></span>
+          <span class="pulse-dot"></span>
+          <span class="pulse-dot"></span>
+          <span style="margin-left:8px">Loading notices...</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- M5: Wiki Index -->
+    <div class="card">
+      <div class="card-header">
+        <h2>📚 Wiki Index</h2>
+        <span class="badge">knowledge</span>
+      </div>
+      <div class="card-body" id="m5-body">
+        <div class="loading-pulse">
+          <span class="pulse-dot"></span>
+          <span class="pulse-dot"></span>
+          <span class="pulse-dot"></span>
+          <span style="margin-left:8px">Loading wiki...</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="app.js?v=20260525b"></script>
+</body>
+</html>
