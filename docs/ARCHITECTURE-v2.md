@@ -124,15 +124,35 @@ CREATE TABLE task_events (
 
 ```sql
 CREATE TABLE agent_config (
-    agent_id   TEXT PRIMARY KEY,
-    api_key    TEXT,               -- gateway认证key
-    model      TEXT,               -- 使用的模型
-    profile    TEXT,               -- hermes profile
-    extra      TEXT                -- JSON格式的扩展配置
+    agent_id       TEXT PRIMARY KEY,
+    api_key        TEXT,               -- gateway认证key
+    nous_token     TEXT UNIQUE,        -- Nous API认证token（注册时生成）
+    role           TEXT DEFAULT 'agent', -- admin/agent角色权限
+    model          TEXT,               -- 使用的模型
+    profile        TEXT,               -- hermes profile
+    extra          TEXT                -- JSON格式的扩展配置
 );
 ```
 
-数据来源：注册时手动录入，对应各agent的gateway配置。
+数据来源：注册时手动录入，对应各agent的gateway配置。nous_token由Nous后端自动生成（32字符随机串），写入各agent的.env中NOUS_API_TOKEN变量。
+
+### 认证机制
+
+所有Nous API端点强制Bearer token认证：
+
+**认证方式：** `Authorization: Bearer {nous_token}`
+
+**角色权限：**
+- admin（苏哥）：全部读写权限，包括注册/移除agent、查看全部信号、任务重分配
+- agent（小亚/柏拉图/Grace等）：信号写入+任务读取+状态查询，不可访问管理端点
+
+**管理端点（admin token only）：**
+- POST /api/agents/register — 注册新agent，生成token
+- DELETE /api/agents/{id} — 移除agent
+- GET /admin/signals — 查看全部信号（不限agent）
+- POST /admin/tasks/reassign — 任务重分配
+
+**未认证请求一律返回 401 Unauthorized。**
 
 ### API设计
 
