@@ -1,8 +1,16 @@
 """Nous v2 — Flask App 入口"""
 import os
 import sys
-from flask import Flask, jsonify, request, send_from_directory, send_file
+import requests
+from flask import Flask, jsonify, request, send_from_directory, send_file, Response
 from flask_cors import CORS
+
+# Agent gateway mapping — backend proxies to avoid CORS
+AGENT_GATEWAYS = {
+    'socrates': {'url': 'http://localhost:8642/v1/chat/completions', 'key': 'your-secret-key'},
+    'aris':     {'url': 'http://localhost:8643/v1/chat/completions', 'key': 'aris-secret'},
+    'plato':    {'url': 'http://localhost:8645/v1/chat/completions', 'key': 'plato-secret'},
+}
 
 # 将 backend/ 目录加入 path
 sys.path.insert(0, os.path.dirname(__file__))
@@ -13,7 +21,7 @@ from routes_signals import signals_bp
 from routes_tasks import tasks_bp
 
 # 前端文件路径
-DASHBOARD_DIR = os.path.join(os.path.dirname(__file__), '..', 'dashboard')
+DASHBOARD_DIR = os.path.join(os.path.dirname(__file__), '..', 'frontend', 'static')
 
 
 def create_app():
@@ -29,7 +37,14 @@ def create_app():
     app.register_blueprint(tasks_bp, url_prefix='/api')
 
     # 认证中间件 (Phase1 就启用 Bearer token)
-    NOUS_TOKEN = os.environ.get('NOUS_API_TOKEN', 'nous-admin-token-v2')
+    # Read token from file first (for dev), fallback to env var
+    TOKEN_FILE = '/tmp/.nous_token'
+    NOUS_TOKEN = None
+    if os.path.exists(TOKEN_FILE):
+        with open(TOKEN_FILE) as f:
+            NOUS_TOKEN = f.read().strip()
+    if not NOUS_TOKEN:
+        NOUS_TOKEN = os.environ.get('NOUS_API_TOKEN', 'nous-admin-token-v2')
 
     @app.before_request
     def check_auth():
@@ -53,6 +68,41 @@ def create_app():
     @app.route('/api/health')
     def health():
         return jsonify({'status': 'ok', 'service': 'nous-v2', 'version': '2.0.0'})
+
+    # Agent Gateway proxy — frontend calls this to avoid CORS
+    @app.route('/api/agent-gateway', methods=['POST', 'OPTIONS'])
+    def agent_gateway_proxy():
+        if request.method == 'OPTIONS':
+            return '', 204
+        data = request.get_json(silent=True) or {}
+        agent_id = data.get('agent_id', '')
+        gateway = AGENT_GATEWAYS.get(agent_id)
+        if not gateway:
+            return jsonify({'error': 'Unknown agent: ' + agent_id}), 400
+
+        payload = {
+            'model': data.get('model', ''),
+            'messages': [
+                {'role': 'system', 'content': data.get('system_prompt', '')},
+                {'role': 'user', 'content': data.get('user_message', '')},
+            ],
+            'max_tokens': data.get('max_tokens', 400),
+            'temperature': data.get('temperature', 0.3),
+        }
+        try:
+            r = requests.post(
+                gateway['url'],
+                json=payload,
+                headers={
+                    'Authorization': 'Bearer ' + gateway['key'],
+                    'Content-Type': 'application/json',
+                },
+                timeout=30,
+                proxies={'http': None, 'https': None},  # bypass Surge proxy for localhost
+            )
+            return Response(r.content, status=r.status_code, content_type='application/json')
+        except requests.RequestException as e:
+            return jsonify({'error': 'Gateway unreachable: ' + str(e)}), 502
 
     # 前端静态文件
     @app.route('/')

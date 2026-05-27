@@ -82,7 +82,45 @@ CREATE TABLE agent_registry (
 - last_activity：从signal_log取最近一条该agent的信号
 - load：从kanban.db统计该agent的running任务数
 
-#### 表2: signal_log
+#### 表2: tasks（黑板任务 — v2.1新增）
+
+任务实体表，取代从信号直接生成任务的旧模式。黑板的数据源。
+
+```sql
+CREATE TABLE tasks (
+    id              TEXT PRIMARY KEY,       -- T-{uuid8}, 如 T-bc41faf8
+    title           TEXT NOT NULL,           -- 任务名
+    description     TEXT,                    -- 任务描述
+    status          TEXT DEFAULT 'pending',  -- pending→processing→done→archived
+    source_signal_id INTEGER,                -- 来源信号ID，FK signal_log.id
+    created_by      TEXT DEFAULT 'socrates',
+    created_at      DATETIME,
+    updated_at      DATETIME
+);
+```
+
+status 生命周期：pending(黑板待取) → processing(苏格拉底分析中/执行中) → done(全部子任务完成) → archived(已归档)
+
+#### 表3: subtasks（执行计划 — v2.1新增）
+
+每个任务拆分为多个子步骤，每个子步骤分配给一个 agent 执行。
+
+```sql
+CREATE TABLE subtasks (
+    id         TEXT PRIMARY KEY,             -- ST-{uuid8}
+    task_id    TEXT NOT NULL,                -- FK tasks.id
+    name       TEXT NOT NULL,                -- 子任务名
+    assignee   TEXT,                         -- agent_id (socrates/aris/plato)
+    status     TEXT DEFAULT 'pending',       -- pending→in_progress→done
+    result     TEXT,                         -- agent 执行结果报告
+    created_at DATETIME,
+    updated_at DATETIME
+);
+```
+
+子任务 result 字段存储 agent LLM 执行的完整输出，归档后可在档案柜详情中查看。
+
+#### 表4: signal_log
 
 ```sql
 CREATE TABLE signal_log (
@@ -101,7 +139,7 @@ CREATE TABLE signal_log (
 - 自动推送：agent worker的post-task-hook写入DONE/BLOCKED/SYNC信号
 - 苏哥监听：苏哥收到agent发来的信号后写入此表
 
-#### 表3: task_events
+#### 表5: task_events
 
 ```sql
 CREATE TABLE task_events (
@@ -120,7 +158,7 @@ CREATE TABLE task_events (
 - 任务状态变更时写入对应事件
 - 与kanban.db的tasks表关联（task_id对应），但独立存储事件流
 
-#### 表4: agent_config
+#### 表6: agent_config
 
 ```sql
 CREATE TABLE agent_config (
@@ -287,7 +325,50 @@ GET  /api/tasks/board          -- 看板视图（按状态分组）
 信号写入触发点：
 1. agent worker的post-task-hook（自动，DONE/BLOCKED/SYNC）
 2. gateway直连通信时，苏哥cron监听并记录
-3. 手动写入（苏哥创建任务时记录created事件）
+- 手动写入（苏哥创建任务时记录created事件）
+
+### 任务工作流（v2.1）
+
+完整生命周期：
+
+```
+外部/用户 → POST /api/tasks → tasks(status=pending)     ← 黑板
+                                        ↓
+苏格拉底定时扫描黑板 → tasks(status→processing)
+                                        ↓
+苏格拉底调 LLM (8642) 分析任务 → 领域/复杂度/子任务计划
+                                        ↓
+子任务落库 → POST /api/tasks/{id}/subtasks → subtasks(pending)
+                                        ↓
+逐个子任务执行 → 调对应agent LLM (8643/8645)
+  → subtasks(status→done, result=LLM输出)
+                                        ↓
+全部子任务完成 → tasks(status→done)
+                                        ↓
+苏格拉底归档 → tasks(status→archived)    ← 档案柜（只增不减）
+```
+
+三条数据原则：
+1. 黑板取一少一：仅显示 pending/processing 状态的任务
+2. 任务完成后进档案柜：status='archived'，从黑板移除
+3. 档案柜只增不减：归档任务永久保留
+
+### Agent Gateway 代理（v2.1）
+
+前端调用 agent LLM 需通过 Nous 后端转发，避免 CORS 和 Surge 代理冲突：
+
+```
+前端 callAgentGateway(agent, prompt)
+  → POST /api/agent-gateway {agent_id, messages}
+    → Flask requests.post(agent.url, proxies={'http': None, 'https': None})
+      → Agent Gateway (8642/8643/8645)
+        → 返回 LLM 响应
+```
+
+### 黑板过滤（v2.1）
+
+前端黑板视图过滤 HEARTBEAT 信号，只显示可操作信号（ASK/BLOCKED/REPAIR/DONE/SYNC/STATUS）。
+agent 在线状态独立从 agent_registry.heartbeat_status 读取，不受黑板过滤影响。
 
 ## 前端设计
 

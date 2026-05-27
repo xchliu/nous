@@ -56,6 +56,7 @@ class SignalLog(db.Model):
     task_id       = db.Column(db.Text)
     content       = db.Column(db.Text)
     metadata_json = db.Column(db.Text)
+    consumed      = db.Column(db.Boolean, default=False)
     created_at    = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     def to_dict(self):
@@ -67,6 +68,7 @@ class SignalLog(db.Model):
             'task_id':       self.task_id,
             'content':       self.content,
             'metadata_json': self.metadata_json,
+            'consumed':      self.consumed,
             'created_at':    self.created_at.isoformat() if self.created_at else None,
         }
 
@@ -90,6 +92,61 @@ class TaskEvent(db.Model):
             'agent_id':   self.agent_id,
             'detail':     self.detail,
             'created_at': self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+# ── Task Entity (黑板) ──────────────────────────────────────────
+class Task(db.Model):
+    __tablename__ = 'tasks'
+
+    id              = db.Column(db.Text, primary_key=True)
+    title           = db.Column(db.Text, nullable=False)
+    description     = db.Column(db.Text)
+    status          = db.Column(db.Text, default='pending')  # pending→processing→done→archived
+    source_signal_id = db.Column(db.Integer, db.ForeignKey('signal_log.id'))
+    created_by      = db.Column(db.Text, default='socrates')
+    created_at      = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at      = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    subtasks = db.relationship('SubTask', backref='task', lazy=True, cascade='all, delete-orphan')
+
+    def to_dict(self):
+        return {
+            'id':              self.id,
+            'title':           self.title,
+            'description':     self.description,
+            'status':          self.status or 'pending',
+            'source_signal_id': self.source_signal_id,
+            'created_by':      self.created_by,
+            'created_at':      self.created_at.isoformat() if self.created_at else None,
+            'updated_at':      self.updated_at.isoformat() if self.updated_at else None,
+            'subtasks':        [s.to_dict() for s in self.subtasks] if self.subtasks else [],
+        }
+
+
+# ── SubTask (执行计划) ──────────────────────────────────────────
+class SubTask(db.Model):
+    __tablename__ = 'subtasks'
+
+    id         = db.Column(db.Text, primary_key=True)
+    task_id    = db.Column(db.Text, db.ForeignKey('tasks.id'), nullable=False)
+    name       = db.Column(db.Text, nullable=False)
+    assignee   = db.Column(db.Text)                        # agent_id
+    status     = db.Column(db.Text, default='pending')     # pending→in_progress→done
+    result     = db.Column(db.Text)                        # agent 执行结果报告
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    def to_dict(self):
+        return {
+            'id':         self.id,
+            'task_id':    self.task_id,
+            'name':       self.name,
+            'assignee':   self.assignee,
+            'status':     self.status or 'pending',
+            'result':     self.result,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
         }
 
 

@@ -1,195 +1,156 @@
 # Nous Dashboard v2 — 开发指引
 
-> 本文档是小亚的开发指引，基于 ARCHITECTURE-v2.md 和 PROTOCOL.md v1.1。
-> 目标：快速出demo，先看到界面再迭代。
+> 本文档反映当前实际架构。基于 ARCHITECTURE-v2.md 和 PROTOCOL.md。
+> 目标：多智能体协同框架，黑板取任务→LLM分析→拆子任务→agent执行→归档。
 
-## 核心变更：从"仪表盘"到"协同框架"
-
-v1 是前端页面 + 数据寄生 SelfMind。
-v2 是独立框架：Nous有自己的后端(Flask+SQLite) + 数据层 + API。
-
-## 坦哥要的三个核心信息
-
-这是 Dashboard 的三个核心视图，每个都必须可见：
-
-1. **Agent自身状态** — 在线/心跳/当前任务/最近活动/负载
-2. **Agent间沟通记录** — 信号时间线（ASK/DONE/BLOCKED/SYNC/HEARTBEAT/REPAIR 全量）
-3. **任务状态** — 生命周期事件流（分配→认领→进行→完成→验收）
-
-## Phase 1: 先出Demo（最快速度）
-
-### 1.1 Nous 后端骨架（端口 8600）
+## 当前架构概览
 
 ```
 nous/
   backend/
-    app.py          # Flask app, port 8600
-    models.py       # SQLAlchemy models (4 tables)
-    routes_agents.py  # /api/agents/*
-    routes_signals.py # /api/signals/*
-    routes_tasks.py   # /api/tasks/*
-    seed.py         # Mock data seeder
+    app.py              # Flask app, port 8600, 含 /api/agent-gateway 代理
+    models.py           # 6 张表: agent_registry, signal_log, task_events, tasks, subtasks, agent_config
+    routes_agents.py    # /api/agents/*
+    routes_signals.py   # /api/signals/*
+    routes_tasks.py     # /api/tasks/* + /api/tasks/<id>/subtasks + /api/tasks/<id>/archive
+    nous.db             # SQLite 数据库
+  frontend/
+    static/
+      index.html        # 入口页面
+      css/style.css     # 样式
+      js/config.js      # CONFIG: API地址/token/agent网关/定时/坐标
+      js/api.js         # 数据层: nousFetch/agent gateway调用
+      js/workflow.js    # 自动工作流: 信号消费→任务创建→LLM分析→子任务执行→归档
+      js/conference.js  # 渲染: 黑板/议事桌/议程/档案柜/SVG动画
+  docs/
+    ARCHITECTURE-v2.md  # 架构文档
+    PROTOCOL.md         # 多agent通信协议
+    DEV-GUIDE-v2.md     # 本文档
 ```
 
-**数据表（ARCHITECTURE-v2 定义）：**
+## 数据模型（当前实际）
+
+### 表0: tasks（黑板任务）
 
 ```sql
--- agent_registry
-CREATE TABLE agent_registry (
-  agent_id TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  role TEXT,
-  gateway_port INTEGER,
-  status TEXT DEFAULT 'offline',
-  last_heartbeat DATETIME,
-  current_task_id TEXT,
-  last_signal_at DATETIME,
-  api_key TEXT,
-  config_json TEXT
-);
-
--- signal_log
-CREATE TABLE signal_log (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  signal_type TEXT NOT NULL,  -- HEARTBEAT/STATUS/BLOCKED/DONE/ASK:arch/ASK:impl/SYNC/REPAIR
-  from_agent TEXT NOT NULL,
-  to_agent TEXT,              -- NULL = broadcast
-  task_id TEXT,
-  content TEXT,
-  metadata_json TEXT,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-
--- task_events
-CREATE TABLE task_events (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  task_id TEXT NOT NULL,
-  event_type TEXT NOT NULL,   -- created/assigned/claimed/started/blocked/completed/reviewed/accepted/reassigned
-  agent_id TEXT,
-  detail TEXT,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-
--- agent_config
-CREATE TABLE agent_config (
-  agent_id TEXT PRIMARY KEY,
-  display_name TEXT,
-  color TEXT,
-  icon TEXT,
-  skills TEXT,
-  nous_api_token TEXT NOT NULL
+CREATE TABLE tasks (
+    id              TEXT PRIMARY KEY,       -- T-{uuid8}, 如 T-bc41faf8
+    title           TEXT NOT NULL,           -- 任务名，如 "报数"
+    description     TEXT,                    -- 任务描述
+    status          TEXT DEFAULT 'pending',  -- pending→processing→done→archived
+    source_signal_id INTEGER,                -- 来源信号ID (FK signal_log)
+    created_by      TEXT DEFAULT 'socrates',
+    created_at      DATETIME,
+    updated_at      DATETIME
 );
 ```
 
-### 1.2 API 端点
+### 表1: subtasks（执行计划）
 
-**认证：** 所有端点需要 Bearer token（Phase1 就启用，不是 Phase2）
-
-```
-# Agent Registry
-GET  /api/agents           → 所有agent状态列表
-GET  /api/agents/{id}      → 单个agent详情
-POST /api/agents/{id}/heartbeat → agent心跳上报
-
-# Signal Log
-GET  /api/signals          → 信号时间线（支持 ?from=&to=&type=&agent= 过滤）
-POST /api/signals          → 写入新信号
-GET  /api/signals/stats    → 信号统计（各类型数量、各agent活跃度）
-
-# Task Lifecycle
-GET  /api/tasks            → 任务列表（支持 ?status=&agent= 过滤）
-GET  /api/tasks/{id}/events → 单个任务的生命周期事件流
-GET  /api/tasks/events     → 全部任务事件时间线
+```sql
+CREATE TABLE subtasks (
+    id         TEXT PRIMARY KEY,             -- ST-{uuid8}
+    task_id    TEXT NOT NULL,                -- FK tasks.id
+    name       TEXT NOT NULL,                -- 子任务名，如 "从1到10依次输出数字"
+    assignee   TEXT,                         -- agent_id: socrates/aris/plato
+    status     TEXT DEFAULT 'pending',       -- pending→in_progress→done
+    result     TEXT,                         -- agent 执行结果报告（LLM输出）
+    created_at DATETIME,
+    updated_at DATETIME
+);
 ```
 
-### 1.3 Mock 数据种子
+### 表2: signal_log（通信信号）
 
-seed.py 生成以下 mock 数据：
+信号有 `consumed` 布尔标记（consumed=True 的信号不再出现在黑板候选列表中）。
+6 种信号类型：ASK:arch / ASK:impl / BLOCKED / DONE / REPAIR / SYNC / STATUS。HEARTBEAT 保留在 DB 但前端黑板过滤不显示。
 
-**4 个 agent：**
-- socrates (苏哥, PM, 8642, #2563eb)
-- aris (小亚, Dev, 8643, #10b981)
-- plato (柏拉图, Arch, 8645, #f97316)
-- plato (柏拉图, Architect, 8645, #e17055)
+### 其他表（不变）
 
-**模拟信号时间线（最近24小时）：**
-- 每个agent 3-5条 HEARTBEAT
-- 苏哥 2条 DONE（验收完成）
-- 小亚 1条 BLOCKED（gateway TTFB慢）
-- 柏拉图 1条 ASK:arch（评审反馈）
-- 苏哥 1条 REPAIR（修复柏拉图provider配置）
+agent_registry / task_events / agent_config — 与 ARCHITECTURE-v2.md 定义一致。
 
-**模拟任务事件（2-3个任务的完整生命周期）：**
-- TD-003: created→assigned→claimed→started→completed→reviewed→accepted
-- TD-004: created→assigned→claimed→started→blocked→reassigned→started→completed
+## 生命周期流程
 
-### 1.4 前端 Demo
-
-基于现有 dashboard/app.js 改造，新增两个模块：
-
-**M1 改造：Agent Status → Agent Registry**
-- 不仅显示在线/离线，还显示：当前任务、最近心跳时间、最近信号时间
-- 心搏状态指示灯：绿色=最近60分钟内有HEARTBEAT，黄色=60-120分钟，红色=超2小时/离线
-
-**新增 M6：Signal Timeline（核心新模块）**
-- 垂直时间线，显示所有信号（HEARTBEAT/STATUS/BLOCKED/DONE/ASK/SYNC/REPAIR）
-- 每条信号显示：from_agent→to_agent、signal_type、时间、摘要
-- 支持按 signal_type 和 agent 过滤
-- BLOCKED 和 REPAIR 高亮显示（红色/橙色）
-
-**M2 改造：Task Board → Task Lifecycle**
-- 保留 Kanban 四列视图
-- 新增：点击任务展开生命周期事件流（created→claimed→started→completed 等时间线）
-- blocked 任务红色标注，附阻塞原因
-
-### 1.5 前端调用 Nous API
-
-```javascript
-const NOUS_API = 'http://localhost:8600';
-const NOUS_TOKEN = 'nous-admin-token-v2'; // admin token for demo
-
-// 所有请求带 Authorization header
-function nousFetch(path, options = {}) {
-  return fetch(`${NOUS_API}${path}`, {
-    ...options,
-    headers: { 'Authorization': `Bearer ${NOUS_TOKEN}`, ...options.headers },
-  }).then(r => r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`));
-}
+```
+用户/外部 → POST /api/tasks → tasks(status=pending)  ← 黑板
+                                        ↓
+苏格拉底取任务 → tasks(status→processing)
+                                        ↓
+苏格拉底调 LLM (8642 gateway) 分析任务 → 领域/复杂度/子任务计划
+                                        ↓
+拆子任务 → POST /api/tasks/{id}/subtasks → subtasks(pending)
+                                        ↓
+逐个子任务执行 → 调对应agent LLM (8643/8645 gateway) → subtasks(status→done) + result
+                                        ↓
+全部完成 → tasks(status→done) → 苏格拉底归档 → tasks(status→archived) ← 档案柜
 ```
 
-## 开发顺序
+三大数据原则：
+1. 黑板取一少一：tasks 只有 pending/processing 状态的任务显示
+2. 任务完成后进档案柜：tasks status='archived'，从黑板移除
+3. 档案柜只增不减：归档任务永远保留
 
-1. backend/app.py + models.py — Flask骨架+数据表
-2. backend/seed.py — Mock数据填充
-3. backend/routes_agents.py — Agent API
-4. backend/routes_signals.py — Signal API
-5. backend/routes_tasks.py — Task API
-6. 启动后端验证 API 响应
-7. 前端改造 M1（Agent Registry）
-8. 前端新增 M6（Signal Timeline）
-9. 前端改造 M2（Task Lifecycle）
-10. 集成测试
+## Agent Gateway 代理
+
+前端不能直接调 8642/8643/8645（CORS + Surge 代理拦截），统一通过 Nous 后端 8600 转发：
+
+```
+前端 callAgentGateway(agent, prompt)
+  → POST /api/agent-gateway {agent_id, messages}
+    → Flask 后端 requests.post() 调 agent gateway
+      → 返回 LLM 响应
+```
+
+Flask 内部调 agent gateway 时必须加 `proxies={'http': None, 'https': None}` 绕过 Surge 代理。
+
+## 认证
+
+- Nous API Token：`nous-admin-token-v2`（从 /tmp/.nous_token 文件读取，避免 sandbox token 截断）
+- Agent Gateway Token：socrates=`your-secret-key`, aris=`aris-secret`, plato=`plato-secret`
+- 前端 `nousFetch` 统一带 `Authorization: Bearer ***`
+
+## 配置项（frontend/static/js/config.js）
+
+- NOUS_API/NOUS_TOKEN — API 地址和认证
+- refreshInterval — 30 秒轮询
+- timeout — 默认 5 秒 API 超时
+- agentGateway — 三个 agent 的 url/key/model
+- timing — 12 个动画/等待时长参数，用户可在 config 层修改
+- SVG 坐标 — table/homePosition/deskPositions/workstationPositions
+
+## 启动方式
+
+```bash
+cd nous/backend
+
+# 确保 /tmp/.nous_token 包含令牌
+echo -n "nous-admin-token-v2" > /tmp/.nous_token
+
+# 启动后端
+python app.py    # 端口 8600
+
+# 浏览器打开
+open http://localhost:8600
+```
+
+## 如何发任务给团队
+
+```bash
+# 通过 API 创建任务
+curl -X POST http://localhost:8600/api/tasks \
+  -H 'Authorization: Bearer nous-admin-token-v2' \
+  -H 'Content-Type: application/json' \
+  -d '{"title": "报数", "description": "从1数到10"}'
+```
+
+或者通过前端页面的"新增任务"输入框。
+
+任务创建后自动进入黑板，苏格拉底会在下一轮自动取走、分析、拆解、分发执行。
 
 ## 技术栈
 
 - 后端：Flask + SQLAlchemy + SQLite
-- 前端：纯 HTML/CSS/JS（现有代码基础上改造，不引入新框架）
-- 认证：Bearer token（Phase1 就启用）
-- 数据：Phase1 先用 mock/seed，Phase2 对接真实数据源
-
-## 交付标准
-
-Demo 能在浏览器打开，看到：
-1. 4个agent的状态卡片（含心跳时间、当前任务）
-2. 信号时间线（可按类型/agent过滤）
-3. 任务看板+生命周期事件流
-
-**不需要完美，需要可运行。** 坦哥看到 demo 才好调方向。
-
-## 关键约束
-
-- Nous 是独立框架，不寄生 SelfMind
-- 后端端口 8600，不和现有服务冲突
-- Phase1 mock 数据，Phase2 再对接真实 gateway/kanban
-- 认证从 Phase1 就启用（Bearer token）
-- 8种信号类型全支持：HEARTBEAT/STATUS/BLOCKED/DONE/ASK:arch/ASK:impl/SYNC/REPAIR
+- 前端：纯 HTML/CSS/JS，6 文件模块化（config/api/workflow/conference + index + css）
+- 认证：Bearer token
+- LLM：通过 agent gateway (8642/8643/8645) 调 DeepSeek 模型
+- 部署：8600 端口独立进程

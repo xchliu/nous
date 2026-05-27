@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nous · 圆桌议事</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header class="header">
+  <div class="header-left">
+    <div class="header-logo">N</div>
+    <h1>圆桌议事</h1>
+    <span class="header-subtitle">Nous</span>
+  </div>
+  <div class="header-right">
+    <div class="refresh-status">
+      <span class="refresh-dot" id="refresh-dot"></span>
+      <span>Auto</span>
+    </div>
+    <span class="last-updated" id="last-updated">&mdash;</span>
+  </div>
+</header>
+
+<div class="main">
+  <!-- Panel 1: 黑板 -->
+  <div class="panel panel-blackboard">
+    <div class="panel-header"><span class="icon">&#9924;</span> 黑板</div>
+    <div class="panel-body">
+      <div class="blackboard-scene">
+        <div class="blackboard-content" id="blackboard-content"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Panel 2: 议事厅 -->
+  <div class="panel panel-meetingroom">
+    <div class="panel-header"><span class="icon">&#9752;</span> 议事厅</div>
+    <div class="panel-body" style="display:flex;flex-direction:column;padding:14px 20px 12px">
+      <div class="meetingroom-scene" id="mr-scene">
+        <svg class="meetingroom-svg" id="mr-svg" viewBox="0 0 800 420" preserveAspectRatio="xMidYMid meet"></svg>
+        <!-- Desks + characters + tasks rendered by JS -->
+        <div id="mr-desks"></div>
+        <div id="mr-characters"></div>
+        <div id="mr-tasks"></div>
+        <div id="mr-popup" class="popup-overlay" style="display:none"></div>
+        <div id="wf-status" class="wf-status-bar">&#x23F3; 等待启动...</div>
+      </div>
+      <div class="agenda-section" id="agenda-section">
+        <div class="agenda-header">
+          <span class="agenda-title">议程 &middot; Agenda</span>
+          <span class="agenda-title" style="font-weight:400;font-variant-numeric:tabular-nums" id="agenda-count"></span>
+        </div>
+        <div class="agenda-items" id="agenda-items"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Panel 3: 档案库 -->
+  <div class="panel panel-archive">
+    <div class="panel-header"><span class="icon">&#128451;</span> 档案库 &middot; Archive</div>
+    <div class="archive-body" id="archive-body"></div>
+    <div class="archive-detail" id="archive-detail">
+      <div class="detail-header">
+        <h3>生命周期 &middot; Lifecycle</h3>
+        <span class="detail-id" id="detail-id">&mdash;</span>
+      </div>
+      <div class="detail-timeline" id="detail-timeline"></div>
+    </div>
+  </div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/conference.js"></script>
+<script src="js/workflow.js"></script>
+<script src="js/api.js"></script>
+</body>
+</html>

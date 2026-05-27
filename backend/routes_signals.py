@@ -84,3 +84,18 @@ def signal_stats():
         'type_counts': {t: c for t, c in type_counts},
         'agent_activity': {a: c for a, c in agent_counts},
     })
+
+
+@signals_bp.route('/signals/<int:signal_id>/consume', methods=['POST'])
+def consume_signal(signal_id):
+    """标记信号已被消费(Socrates取走后标记)"""
+    signal = SignalLog.query.get(signal_id)
+    if not signal:
+        return jsonify({'error': 'Signal not found'}), 404
+
+    data = request.get_json(silent=True) or {}
+    signal.consumed = True
+    if data.get('task_id'):
+        signal.task_id = data['task_id']
+    db.session.commit()
+    return jsonify({'signal': signal.to_dict(), 'message': 'Signal consumed'})
